@@ -26,6 +26,7 @@ const client = new MongoClient(uri, {
 });
 
 
+let userCollection;
 
 
 async function run() {
@@ -34,6 +35,7 @@ async function run() {
     console.log("Connected to MongoDB!");
 
     const db = client.db(process.env.DB_NAME);
+    userCollection = db.collection("users");
 
     console.log(`Connected to MongoDB: ${process.env.DB_NAME}`);
 
@@ -58,3 +60,40 @@ app.get("/", (req, res) => {
   res.send("Hello, I am LifeSure!");
 });
 
+
+
+// check if user exist or not if not exist then create user
+
+app.post("/api/users", async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Email is required" });
+    }
+
+    // check if user already exists
+    const existingUser = await userCollection.findOne({ email });
+    if (existingUser) {
+      return res.status(200).json({
+        success: true,
+        message: "User already exists",
+        data: existingUser,
+      });
+    }
+
+    // create new user
+    const result = await userCollection.insertOne(req.body);
+
+    return res.status(201).json({
+      success: true,
+      message: "User created successfully",
+      data: result,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
