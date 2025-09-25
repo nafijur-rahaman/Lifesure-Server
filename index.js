@@ -28,6 +28,7 @@ const client = new MongoClient(uri, {
 
 let userCollection;
 let policyCollection;
+let blogCollection;
 
 
 async function run() {
@@ -38,6 +39,7 @@ async function run() {
     const db = client.db(process.env.DB_NAME);
     userCollection = db.collection("users");
     policyCollection = db.collection("policies");
+    blogCollection = db.collection("blogs");
 
     console.log(`Connected to MongoDB: ${process.env.DB_NAME}`);
 
@@ -64,41 +66,11 @@ app.get("/", (req, res) => {
 
 
 
-// check if user exist or not if not exist then create user
 
-app.post("/api/users", async (req, res) => {
-  try {
-    const { email } = req.body;
 
-    if (!email) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Email is required" });
-    }
 
-    // check if user already exists
-    const existingUser = await userCollection.findOne({ email });
-    if (existingUser) {
-      return res.status(200).json({
-        success: true,
-        message: "User already exists",
-        data: existingUser,
-      });
-    }
 
-    // create new user
-    const result = await userCollection.insertOne(req.body);
-
-    return res.status(201).json({
-      success: true,
-      message: "User created successfully",
-      data: result,
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, message: "Server error" });
-  }
-});
+//-----------------policy routes------------------//
 
 
 //create new polices
@@ -184,3 +156,182 @@ app.delete("/api/delete-policy/:id", async (req, res) => {
 });
 
 
+
+
+// ---------------- user Routes ---------------- //
+
+// check if user exist or not if not exist then create user
+
+app.post("/api/users", async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Email is required" });
+    }
+
+    // check if user already exists
+    const existingUser = await userCollection.findOne({ email });
+    if (existingUser) {
+      return res.status(200).json({
+        success: true,
+        message: "User already exists",
+        data: existingUser,
+      });
+    }
+
+    // create new user
+    const result = await userCollection.insertOne(req.body);
+
+    return res.status(201).json({
+      success: true,
+      message: "User created successfully",
+      data: result,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+
+
+
+// get all users
+
+app.get("/api/get-users", async(req,res)=>{
+
+  try {
+    const users = await userCollection.find().toArray();
+    res.status(200).json({
+      success: true,
+      message: "Users fetched successfully",
+      data: users,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+})
+
+
+// Update user role
+app.put("/api/update-user-role/:id", async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const { role } = req.body;
+
+    const result = await userCollection.updateOne(
+      { _id: new ObjectId(userId) },
+      { $set: { role } }
+    );
+
+    res.json({ success: true, message: "Role updated", data: result });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+// Delete user
+app.delete("/api/delete-user/:id", async (req, res) => {
+  try {
+    const userId = req.params.id;
+    const result = await userCollection.deleteOne({ _id: new ObjectId(userId) });
+
+    res.json({ success: true, message: "User deleted", data: result });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+
+
+
+
+// ---------------- Blogs Routes ---------------- //
+
+app.get("/api/get-blogs", async (req, res) => {
+  try {
+    const blogs = await blogCollection.find().toArray();
+    res.status(200).json({
+      success: true,
+      message: "Blogs fetched successfully",
+      data: blogs,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+// get blog by id
+app.get("/api/get-blogs", async (req, res) => {
+  try {
+    const { userId } = req.query;
+    let query = {};
+    if (userId) query.userId = userId;
+
+    const blogs = await blogCollection.find(query).toArray();
+    res.status(200).json({
+      success: true,
+      message: "Blogs fetched successfully",
+      data: blogs,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+
+
+// create blog 
+
+
+app.post("/api/create-blog", async (req, res) => {
+  try {
+    const result = await blogCollection.insertOne(req.body);
+    res.status(201).json({
+      success: true,
+      message: "Blog created successfully",
+      data: result,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+// update blog 
+
+app.put("/api/update-blog/:id", async (req, res) => {
+  try {
+    const blogId = req.params.id;
+    const result = await blogCollection.updateOne(
+      { _id: new ObjectId(blogId) },
+      { $set: req.body }
+    );
+    res.status(200).json({
+      success: true,
+      message: "Blog updated successfully",
+      data: result,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+
+// delete blog 
+
+app.delete("/api/delete-blog/:id", async (req, res) => {
+  try {
+    const blogId = req.params.id;
+    const result = await blogCollection.deleteOne({ _id: new ObjectId(blogId) });
+    res.status(200).json({
+      success: true,
+      message: "Blog deleted successfully",
+      data: result,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
