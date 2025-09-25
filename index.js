@@ -27,6 +27,7 @@ const client = new MongoClient(uri, {
 
 
 let userCollection;
+let policyCollection;
 
 
 async function run() {
@@ -36,6 +37,7 @@ async function run() {
 
     const db = client.db(process.env.DB_NAME);
     userCollection = db.collection("users");
+    policyCollection = db.collection("policies");
 
     console.log(`Connected to MongoDB: ${process.env.DB_NAME}`);
 
@@ -97,3 +99,88 @@ app.post("/api/users", async (req, res) => {
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
+
+
+//create new polices
+
+app.post("/api/create-polices", async(req,res)=>{
+
+  const newPolicy = req.body;
+
+  try {
+    const result = await policyCollection.insertOne(newPolicy);
+    res.status(201).json({
+      success: true,
+      message: "Policy created successfully",
+      data: result,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+
+
+})
+
+
+// update policy
+
+
+app.put("/api/update-policy/:id", async(req,res)=>{
+
+  const policyId = req.params.id;
+  const updatedPolicy = req.body;
+
+  // console.log(updatedPolicy, policyId);
+
+  try {
+    const result = await policyCollection.updateOne(
+      { _id: new ObjectId(policyId) },
+      { $set: updatedPolicy }
+    );
+    res.status(200).json({
+      success: true,
+      message: "Policy updated successfully",
+      data: result,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+})
+
+
+
+// get all policies
+
+
+app.get("/api/get-policies", async (req, res) => {
+  try {
+    const policies = await policyCollection.find().toArray();
+    res.status(200).json({
+      success: true,
+      message: "Policies fetched successfully",
+      data: policies,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+
+// delete policy
+
+
+app.delete("/api/delete-policy/:id", async (req, res) => {
+  try {
+    const policyId = req.params.id;
+    const result = await policyCollection.deleteOne({ _id: new ObjectId(policyId) });
+    res.status(200).json({
+      success: true,
+      message: "Policy deleted successfully",
+      data: result,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+
