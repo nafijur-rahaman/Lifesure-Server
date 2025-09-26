@@ -6,9 +6,6 @@ const jwt = require("jsonwebtoken");
 const verifyJWT = require("./middleware/verifyJWT");
 const JWT_SECRET = process.env.JWT_SECRET;
 
-
-
-
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -20,20 +17,18 @@ const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster
 
 // MongoDB client setup
 
-
 const client = new MongoClient(uri, {
   serverApi: {
     version: ServerApiVersion.v1,
     strict: true,
     deprecationErrors: true,
-  }
+  },
 });
-
 
 let userCollection;
 let policyCollection;
 let blogCollection;
-
+let applicationCollection;
 
 async function run() {
   try {
@@ -44,6 +39,7 @@ async function run() {
     userCollection = db.collection("users");
     policyCollection = db.collection("policies");
     blogCollection = db.collection("blogs");
+    applicationCollection = db.collection("applications");
 
     console.log(`Connected to MongoDB: ${process.env.DB_NAME}`);
 
@@ -56,11 +52,7 @@ async function run() {
   }
 }
 
-
 run().catch(console.dir);
-
-
-
 
 // ---------------- Routes ---------------- //
 
@@ -68,28 +60,24 @@ app.get("/", (req, res) => {
   res.send("Hello, I am LifeSure!");
 });
 
-
-
 // login for retrieve jwt token
 
-app.post("/api/login", async(req,res)=>{
-  const {email} = req.body;
-  if (!email) return res.status(400).json({success: false, message: "Email is required."});
+app.post("/api/login", async (req, res) => {
+  const { email } = req.body;
+  if (!email)
+    return res
+      .status(400)
+      .json({ success: false, message: "Email is required." });
   const payload = { email };
   const token = jwt.sign(payload, JWT_SECRET, { expiresIn: "1h" });
-  res.status(200).json({success: true, message: "Login successful", token});
-})
-
-
-
+  res.status(200).json({ success: true, message: "Login successful", token });
+});
 
 //-----------------policy routes------------------//
 
-
 //create new polices
 
-app.post("/api/create-polices", async(req,res)=>{
-
+app.post("/api/create-polices", async (req, res) => {
   const newPolicy = req.body;
 
   try {
@@ -102,16 +90,11 @@ app.post("/api/create-polices", async(req,res)=>{
   } catch (err) {
     res.status(500).json({ success: false, message: "Server error" });
   }
-
-
-})
-
+});
 
 // update policy
 
-
-app.put("/api/update-policy/:id", async(req,res)=>{
-
+app.put("/api/update-policy/:id", async (req, res) => {
   const policyId = req.params.id;
   const updatedPolicy = req.body;
 
@@ -130,12 +113,9 @@ app.put("/api/update-policy/:id", async(req,res)=>{
   } catch (err) {
     res.status(500).json({ success: false, message: "Server error" });
   }
-})
-
-
+});
 
 // get all policies
-
 
 app.get("/api/get-policies", verifyJWT, async (req, res) => {
   try {
@@ -150,14 +130,32 @@ app.get("/api/get-policies", verifyJWT, async (req, res) => {
   }
 });
 
+//get policy by id
+
+app.get("/api/get-policy/:id", async (req, res) => {
+  try {
+    const policyId = req.params.id;
+    const policy = await policyCollection.findOne({
+      _id: new ObjectId(policyId),
+    });
+    res.status(200).json({
+      success: true,
+      message: "Policy fetched successfully",
+      data: policy,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
 
 // delete policy
-
 
 app.delete("/api/delete-policy/:id", async (req, res) => {
   try {
     const policyId = req.params.id;
-    const result = await policyCollection.deleteOne({ _id: new ObjectId(policyId) });
+    const result = await policyCollection.deleteOne({
+      _id: new ObjectId(policyId),
+    });
     res.status(200).json({
       success: true,
       message: "Policy deleted successfully",
@@ -167,9 +165,6 @@ app.delete("/api/delete-policy/:id", async (req, res) => {
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
-
-
-
 
 // ---------------- user Routes ---------------- //
 
@@ -209,13 +204,9 @@ app.post("/api/users", async (req, res) => {
   }
 });
 
-
-
-
 // get all users
 
-app.get("/api/get-users", async(req,res)=>{
-
+app.get("/api/get-users", async (req, res) => {
   try {
     const users = await userCollection.find().toArray();
     res.status(200).json({
@@ -226,8 +217,7 @@ app.get("/api/get-users", async(req,res)=>{
   } catch (err) {
     res.status(500).json({ success: false, message: "Server error" });
   }
-})
-
+});
 
 // Update user role
 app.put("/api/update-user-role/:id", async (req, res) => {
@@ -250,7 +240,9 @@ app.put("/api/update-user-role/:id", async (req, res) => {
 app.delete("/api/delete-user/:id", async (req, res) => {
   try {
     const userId = req.params.id;
-    const result = await userCollection.deleteOne({ _id: new ObjectId(userId) });
+    const result = await userCollection.deleteOne({
+      _id: new ObjectId(userId),
+    });
 
     res.json({ success: true, message: "User deleted", data: result });
   } catch (err) {
@@ -259,8 +251,20 @@ app.delete("/api/delete-user/:id", async (req, res) => {
 });
 
 
+// get just agent user 
 
-
+app.get("/api/get-agent-users", async (req, res) => {
+  try {
+    const users = await userCollection.find({ role: "agent" }).toArray();
+    res.status(200).json({
+      success: true,
+      message: "Users fetched successfully",
+      data: users,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
 
 // ---------------- Blogs Routes ---------------- //
 
@@ -295,10 +299,7 @@ app.get("/api/get-blogs", async (req, res) => {
   }
 });
 
-
-
-// create blog 
-
+// create blog
 
 app.post("/api/create-blog", async (req, res) => {
   try {
@@ -313,7 +314,7 @@ app.post("/api/create-blog", async (req, res) => {
   }
 });
 
-// update blog 
+// update blog
 
 app.put("/api/update-blog/:id", async (req, res) => {
   try {
@@ -332,19 +333,234 @@ app.put("/api/update-blog/:id", async (req, res) => {
   }
 });
 
-
-// delete blog 
+// delete blog
 
 app.delete("/api/delete-blog/:id", async (req, res) => {
   try {
     const blogId = req.params.id;
-    const result = await blogCollection.deleteOne({ _id: new ObjectId(blogId) });
+    const result = await blogCollection.deleteOne({
+      _id: new ObjectId(blogId),
+    });
     res.status(200).json({
       success: true,
       message: "Blog deleted successfully",
       data: result,
     });
   } catch (err) {
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+// ---------------- Application Routes ---------------- //
+
+//get all submitted application
+
+app.get("/api/applications", async (req, res) => {
+  try {
+    const applications = await applicationCollection
+      .find()
+      .sort({ createdAt: -1 })
+      .toArray();
+
+    // Fetch policies for each application
+    const applicationsWithPolicy = await Promise.all(
+      applications.map(async (app) => {
+        if (!app.policy_id) return app;
+
+        const policy = await policyCollection.findOne({ _id: new ObjectId(app.policy_id) });
+        return { ...app, policyInfo: policy }; 
+      })
+    );
+
+    res.status(200).json({ success: true, data: applicationsWithPolicy });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+
+// Update application set agent
+app.patch("/api/application/:id/assign-agent", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { agent } = req.body;
+
+    if (!agent) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Agent is required" });
+    }
+
+    const result = await applicationCollection.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { agent } }
+    );
+
+    if (result.matchedCount === 0) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Application not found" });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Agent assigned successfully",
+    });
+  } catch (err) {
+    console.error("Error assigning agent:", err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+
+//submit application
+
+app.post("/api/submit-application", async (req, res) => {
+  try {
+    const {
+      name,
+      email,
+      address = "",
+      nid = "",
+      phone,
+      nomineeName = "",
+      nomineeRelation = "",
+      health = [],
+      policy_id = null,
+    } = req.body;
+
+    // Basic required validation
+    if (!name || !email || !phone) {
+      return res.status(400).json({
+        success: false,
+        message: "Name, Email, and Phone are required.",
+      });
+    }
+
+    const newApplication = {
+      name,
+      email,
+      address,
+      nid,
+      phone,
+      nomineeName,
+      nomineeRelation,
+      health,
+      policy_id, 
+      status: "Pending", // default
+      agent: null, // no agent assigned yet
+      createdAt: new Date(),
+    };
+
+    const result = await applicationCollection.insertOne(newApplication);
+
+    res.status(201).json({
+      success: true,
+      message: "Application submitted successfully",
+      data: { applicationId: result.insertedId },
+    });
+  } catch (err) {
+    console.error("Error submitting application:", err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+// Get all applications for a given agent by email
+app.get("/api/agent/:agentEmail/applications", async (req, res) => {
+  try {
+    const { agentEmail } = req.params;
+
+    const applications = await applicationCollection
+      .find({ agent: agentEmail }) // match by email
+      .sort({ createdAt: -1 })
+      .toArray();
+
+    // Attach policy info
+    const applicationsWithPolicy = await Promise.all(
+      applications.map(async (app) => {
+        let policy = null;
+        if (app.policy_id) {
+          policy = await policyCollection.findOne({
+            _id: new ObjectId(app.policy_id),
+          });
+        }
+        return {
+          _id: app._id,
+          name: app.name,
+          email: app.email,
+          status: app.status,
+          policyInfo: policy
+            ? { _id: policy._id, title: policy.title }
+            : null,
+          createdAt: app.createdAt,
+          agent: app.agent, // include agent email
+        };
+      })
+    );
+
+    res.status(200).json({ success: true, data: applicationsWithPolicy });
+  } catch (err) {
+    console.error("Error fetching agent applications:", err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+
+//update status and purchase count
+
+app.patch("/api/agent/application/:id/status", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    const allowedStatuses = ["Pending", "Approved", "Rejected"];
+    if (!allowedStatuses.includes(status)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid status" });
+    }
+    
+    if (!status) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Status is required" });
+    }
+
+    const application = await applicationCollection.findOne({
+      _id: new ObjectId(id),
+    });
+    if (!application) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Application not found" });
+    }
+
+    const prevStatus = application.status;
+
+    // Update status
+    await applicationCollection.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { status } }
+    );
+
+    // If approved → increment purchase count (only once)
+    if (
+      status === "Approved" &&
+      prevStatus !== "Approved" &&
+      application.policy_id
+    ) {
+      await policyCollection.updateOne(
+        { _id: new ObjectId(application.policy_id) },
+        { $inc: { purchaseCount: 1 } }
+      );
+    }
+
+    res
+      .status(200)
+      .json({ success: true, message: "Status updated successfully" });
+  } catch (err) {
+    console.error("Error updating application status:", err);
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
