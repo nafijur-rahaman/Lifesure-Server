@@ -2,8 +2,12 @@ require("dotenv").config();
 const express = require("express");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const cors = require("cors");
-const admin = require("./firebaseAdmin");
-const { verifyToken } = require("./middleware/authMiddleware");
+const jwt = require("jsonwebtoken");
+const verifyJWT = require("./middleware/verifyJWT");
+const JWT_SECRET = process.env.JWT_SECRET;
+
+
+
 
 const app = express();
 app.use(cors());
@@ -66,6 +70,15 @@ app.get("/", (req, res) => {
 
 
 
+// login for retrieve jwt token
+
+app.post("/api/login", async(req,res)=>{
+  const {email} = req.body;
+  if (!email) return res.status(400).json({success: false, message: "Email is required."});
+  const payload = { email };
+  const token = jwt.sign(payload, JWT_SECRET, { expiresIn: "1h" });
+  res.status(200).json({success: true, message: "Login successful", token});
+})
 
 
 
@@ -124,7 +137,7 @@ app.put("/api/update-policy/:id", async(req,res)=>{
 // get all policies
 
 
-app.get("/api/get-policies", async (req, res) => {
+app.get("/api/get-policies", verifyJWT, async (req, res) => {
   try {
     const policies = await policyCollection.find().toArray();
     res.status(200).json({
