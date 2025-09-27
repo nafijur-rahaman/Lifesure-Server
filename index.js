@@ -30,6 +30,7 @@ let policyCollection;
 let blogCollection;
 let applicationCollection;
 let reviewCollection;
+let transactionsCollection;
 
 async function run() {
   try {
@@ -42,6 +43,7 @@ async function run() {
     blogCollection = db.collection("blogs");
     applicationCollection = db.collection("applications");
     reviewCollection = db.collection("reviews");
+    transactionsCollection = db.collection("transactions");
 
     console.log(`Connected to MongoDB: ${process.env.DB_NAME}`);
 
@@ -632,6 +634,25 @@ app.patch("/api/agent/application/:id/status", async (req, res) => {
 });
 
 
+// get specific application by id
+app.get("/api/get-application/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const application = await applicationCollection.findOne({
+      _id: new ObjectId(id),
+    });
+    if (!application) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Application not found" });
+    }
+    res.status(200).json({ success: true, data: application });
+  } catch (err) {
+    console.error("Error fetching application:", err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
 
 //get all applied policies by email
 
@@ -720,6 +741,108 @@ app.get("/api/reviews", async (req, res) => {
   } catch (err) {
     console.error("Error fetching reviews:", err);
     res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+
+//----------------- Payment Routes ----------------- //
+
+
+// stripe payment creation
+
+
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+
+// 1️⃣ Create PaymentIntent
+app.post('/api/create-payment', async (req, res) => {
+  // console.log(req.body);
+  const { policyId, policyName, amount, customerEmail } = req.body;
+
+
+  if (!policyId || !policyName || !amount || !customerEmail) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  try {
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: amount * 100, // convert Taka to poisha
+      currency: 'usd',
+      receipt_email: customerEmail,
+      metadata: { policyId, policyName },
+    });
+
+    res.json({ clientSecret: paymentIntent.client_secret });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+
+
+// Save transaction after success and update status and new date in applicationCollection
+app.post('/api/save-transaction', async (req, res) => {
+  const { paymentIntentId, email, policyId, applicationId } = req.body;
+
+  if (!paymentIntentId || !email || !policyId || !applicationId) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  try {
+    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+    const amount = paymentIntent.amount / 100; // poisha → taka
+    const status = paymentIntent.status; 
+    const date = new Date();
+
+    // ✅ Find application by applicationId
+    const application = await applicationCollection.findOne({ _id: new ObjectId(applicationId), email });
+    if (!application) return res.status(404).json({ error: "Application not found" });
+
+    const policyName = application.policyDetails?.title || paymentIntent.metadata.policyName;
+
+    // calculate next due date based on frequency
+    const frequency = application.payment?.frequency || "monthly";
+    let nextPayment = new Date();
+    if (frequency === "monthly") nextPayment.setMonth(nextPayment.getMonth() + 1);
+    else if (frequency === "yearly") nextPayment.setFullYear(nextPayment.getFullYear() + 1);
+
+    // ✅ Update application record
+    await applicationCollection.updateOne(
+      { _id: new ObjectId(applicationId), email },
+      { $set: {
+          status: "Approved",
+          "payment.status": "Paid",
+          "payment.lastPaymentDate": date,
+          "payment.nextPaymentDue": nextPayment,
+          "payment.paymentIntentId": paymentIntentId
+        }
+      }
+    );
+
+    // save transaction log
+    const transaction = {
+      transactionId: paymentIntentId,
+      applicationId,   // ✅ link transaction to application
+      policyId,        // keep for reference
+      customerEmail: email,
+      policyName,
+      paidAmount: amount,
+      date,
+      status
+    };
+
+    await transactionsCollection.insertOne(transaction);
+
+    res.json({ 
+      success: true, 
+      message: 'Transaction saved successfully', 
+      data: { ...transaction, nextPaymentDue: nextPayment }
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
   }
 });
 
