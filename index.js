@@ -319,7 +319,7 @@ app.get("/api/get-blogs", async (req, res) => {
   }
 });
 
-// get blog by id
+// get blog by user id
 app.get("/api/get-blogs", async (req, res) => {
   try {
     const { userId } = req.query;
@@ -337,11 +337,35 @@ app.get("/api/get-blogs", async (req, res) => {
   }
 });
 
+
+// get blog by blog id
+
+app.get("/api/get-blog/:id", async (req, res) => {
+  try {
+    const blogId = req.params.id;
+    const blog = await blogCollection.findOne({ _id: new ObjectId(blogId) });
+    res.status(200).json({
+      success: true,
+      message: "Blog fetched successfully",
+      data: blog,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+
 // create blog
 
 app.post("/api/create-blog", async (req, res) => {
   try {
-    const result = await blogCollection.insertOne(req.body);
+    const blogData = {
+      ...req.body,
+      visited: 0, 
+    };
+
+    const result = await blogCollection.insertOne(blogData);
+
     res.status(201).json({
       success: true,
       message: "Blog created successfully",
@@ -351,6 +375,34 @@ app.post("/api/create-blog", async (req, res) => {
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
+
+//increment visit count
+
+app.post("/api/increment-visit/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await blogCollection.findOneAndUpdate(
+      { _id: new ObjectId(id) },
+      { $inc: { visited: 1 } }, // increment by 1
+      { returnDocument: "after" } // return updated doc
+    );
+
+    if (!result.value) {
+      return res.status(404).json({ success: false, message: "Blog not found" });
+    }
+
+    res.json({
+      success: true,
+      message: "Visit count incremented",
+      data: result.value,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+
 
 // update blog
 
@@ -759,7 +811,7 @@ app.post("/api/create-payment", async (req, res) => {
 
   try {
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: amount * 100, // convert Taka to poisha
+      amount: amount * 100, 
       currency: "usd",
       receipt_email: customerEmail,
       metadata: { policyId, policyName },
