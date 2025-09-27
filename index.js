@@ -995,34 +995,39 @@ app.get("/api/get-all-claims", async (req, res) => {
 app.patch("/api/claim-approve/:claimId", async (req, res) => {
   try {
     const { claimId } = req.params;
+    const { status, agentEmail } = req.body; 
 
     // Find the claim
     const claim = await claimCollection.findOne({ _id: new ObjectId(claimId) });
     if (!claim)
-      return res
-        .status(404)
-        .json({ success: false, message: "Claim not found" });
+      return res.status(404).json({ success: false, message: "Claim not found" });
 
-    // Update claim status
     await claimCollection.updateOne(
       { _id: new ObjectId(claimId) },
-      { $set: { status: "Approved", approvedAt: new Date() } }
+      { 
+        $set: { 
+          status, 
+          approvedAt: status === "Approved" ? new Date() : null, 
+          agentEmail 
+        } 
+      }
     );
 
-    // Increment policy purchase count
-    await policyCollection.updateOne(
-      { _id: new ObjectId(claim.policyId) },
-      { $inc: { purchaseCount: 1 } }
-    );
 
-    res
-      .status(200)
-      .json({ success: true, message: "Claim approved successfully" });
+    if (status === "Approved") {
+      await policyCollection.updateOne(
+        { _id: new ObjectId(claim.policyId) },
+        { $inc: { purchaseCount: 1 } }
+      );
+    }
+
+    res.status(200).json({ success: true, message: `Claim ${status.toLowerCase()} successfully` });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
+
 
 // get claim by policy ID
 app.get("/api/claim-by-policy/:policy_id", async (req, res) => {
@@ -1042,6 +1047,129 @@ app.get("/api/claim-by-policy/:policy_id", async (req, res) => {
     }
 
     res.status(200).json({ success: true, data: claim });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+
+// ---------------- dashboard stats Routes ---------------- //
+
+
+// Get dashboard stats for a specific agent
+app.get("/api/agent/:email/stats", async (req, res) => {
+  try {
+    const agentEmail = req.params.email;
+
+    // Blogs written by this agent
+    const blogsCount = await blogCollection.countDocuments({ authorEmail: agentEmail });
+
+    // Customers assigned to this agent
+    const customersCount = await applicationCollection.countDocuments({ agent: agentEmail });
+
+    // Policies cleared by this agent
+    const policiesClearedCount = await claimCollection.countDocuments({
+      agentEmail: agentEmail,
+      status: "Approved"  // assuming "Approved" means cleared
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        blogs: blogsCount,
+        customers: customersCount,
+        policyCleared: policiesClearedCount,
+      },
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+
+
+app.get("/api/agent/:email/recent-activity", async (req, res) => {
+  try {
+    const agentEmail = req.params.email;
+    const limit = parseInt(req.query.limit) || 5;
+
+    // Fetch recent blogs
+    const blogs = await blogCollection
+      .find({ authorEmail: agentEmail })
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .toArray();
+
+    // Fetch recent assigned customers
+    const customers = await applicationCollection
+      .find({ agent: agentEmail })
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .toArray();
+
+    // Fetch recent cleared policies
+    const policies = await claimCollection
+      .find({ agentEmail: agentEmail, status: "Approved" })
+      .sort({ approvedAt: -1 })
+      .limit(limit)
+      .toArray();
+
+    const activities = [
+      ...blogs.map(b => ({ type: "Blog Posted", name: b.title, date: b.date })),
+      ...customers.map(c => ({ type: "Customer Assigned", name: c.name, date: c.createdAt })),
+      ...policies.map(p => ({ type: "Policy Cleared", name: p.policy_id, date: p.approvedAt })),
+    ];
+
+    // Sort all activities by date descending
+    activities.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    res.status(200).json({ success: true, data: activities.slice(0, limit) });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+
+
+app.get("/api/agent/:email/monthly-activity", async (req, res) => {
+  try {
+    const agentEmail = req.params.email;
+    const year = parseInt(req.query.year) || new Date().getFullYear();
+
+    const getMonthlyCount = async (collection, matchField, statusFilter) => {
+      const match = { [matchField]: agentEmail };
+      if (statusFilter) match.status = statusFilter;
+
+      const pipeline = [
+        { $match: match },
+        {
+          $group: {
+            _id: { $month: "$createdAt" },
+            count: { $sum: 1 },
+          },
+        },
+      ];
+      return collection.aggregate(pipeline).toArray();
+    };
+
+    const blogs = await getMonthlyCount(blogCollection, "authorEmail");
+    const customers = await getMonthlyCount(applicationCollection, "agent");
+    const policies = await getMonthlyCount(claimCollection, "agentEmail", "Approved");
+
+    const data = Array.from({ length: 12 }, (_, i) => {
+      const month = i + 1;
+      return {
+        month: new Date(0, i).toLocaleString("default", { month: "short" }),
+        blogs: blogs.find(b => b._id === month)?.count || 0,
+        customers: customers.find(c => c._id === month)?.count || 0,
+        policies: policies.find(p => p._id === month)?.count || 0,
+      };
+    });
+
+    res.status(200).json({ success: true, data });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: "Server error" });
