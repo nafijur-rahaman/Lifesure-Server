@@ -29,6 +29,7 @@ let userCollection;
 let policyCollection;
 let blogCollection;
 let applicationCollection;
+let reviewCollection;
 
 async function run() {
   try {
@@ -40,6 +41,7 @@ async function run() {
     policyCollection = db.collection("policies");
     blogCollection = db.collection("blogs");
     applicationCollection = db.collection("applications");
+    reviewCollection = db.collection("reviews");
 
     console.log(`Connected to MongoDB: ${process.env.DB_NAME}`);
 
@@ -174,6 +176,8 @@ app.post("/api/users", async (req, res) => {
   try {
     const { email } = req.body;
 
+    // console.log(req.body);
+
     if (!email) {
       return res
         .status(400)
@@ -203,6 +207,35 @@ app.post("/api/users", async (req, res) => {
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
+
+
+// get user info
+
+app.post("/api/user-info", async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ success: false, message: "Email is required" });
+    }
+
+    const user = await userCollection.findOne({ email });
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    // Return full user object
+    return res.status(200).json({
+      success: true,
+      data: user,
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
 
 // get all users
 
@@ -250,8 +283,7 @@ app.delete("/api/delete-user/:id", async (req, res) => {
   }
 });
 
-
-// get just agent user 
+// get just agent user
 
 app.get("/api/get-agent-users", async (req, res) => {
   try {
@@ -367,8 +399,10 @@ app.get("/api/applications", async (req, res) => {
       applications.map(async (app) => {
         if (!app.policy_id) return app;
 
-        const policy = await policyCollection.findOne({ _id: new ObjectId(app.policy_id) });
-        return { ...app, policyInfo: policy }; 
+        const policy = await policyCollection.findOne({
+          _id: new ObjectId(app.policy_id),
+        });
+        return { ...app, policyInfo: policy };
       })
     );
 
@@ -378,7 +412,6 @@ app.get("/api/applications", async (req, res) => {
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
-
 
 // Update application set agent
 app.patch("/api/application/:id/assign-agent", async (req, res) => {
@@ -413,7 +446,6 @@ app.patch("/api/application/:id/assign-agent", async (req, res) => {
   }
 });
 
-
 //submit application
 
 app.post("/api/submit-application", async (req, res) => {
@@ -447,7 +479,7 @@ app.post("/api/submit-application", async (req, res) => {
       nomineeName,
       nomineeRelation,
       health,
-      policy_id, 
+      policy_id,
       status: "Pending", // default
       agent: null, // no agent assigned yet
       createdAt: new Date(),
@@ -490,9 +522,7 @@ app.get("/api/agent/:agentEmail/applications", async (req, res) => {
           name: app.name,
           email: app.email,
           status: app.status,
-          policyInfo: policy
-            ? { _id: policy._id, title: policy.title }
-            : null,
+          policyInfo: policy ? { _id: policy._id, title: policy.title } : null,
           createdAt: app.createdAt,
           agent: app.agent, // include agent email
         };
@@ -505,7 +535,6 @@ app.get("/api/agent/:agentEmail/applications", async (req, res) => {
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
-
 
 //update status and purchase count
 
@@ -520,7 +549,7 @@ app.patch("/api/agent/application/:id/status", async (req, res) => {
         .status(400)
         .json({ success: false, message: "Invalid status" });
     }
-    
+
     if (!status) {
       return res
         .status(400)
@@ -564,3 +593,68 @@ app.patch("/api/agent/application/:id/status", async (req, res) => {
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
+
+//get all applied policies by email
+
+app.get("/api/applied-policies", async (req, res) => {
+  try {
+    const { email } = req.query;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Email query parameter is required",
+      });
+    }
+
+    const applications = await applicationCollection
+      .find({ email })
+      .sort({ createdAt: -1 }) // optional: sort newest first
+      .toArray();
+
+    res.status(200).json({ success: true, data: applications });
+  } catch (err) {
+    console.error("Error fetching applied policies:", err.message);
+    res.status(500).json({ success: false, message: "Internal server error" });
+  }
+});
+
+// ----------------- Review Routes ----------------- //
+
+
+// create reviews
+
+app.post("/api/create-reviews", async (req, res) => {
+  try {
+    const result = await reviewCollection.insertOne(req.body);
+    res.status(201).json({
+      success: true,
+      message: "Review created successfully",
+      data: result,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+//get all reviews
+
+app.get("/api/reviews", async (req, res) => {
+  try {
+    const reviews = await reviewCollection
+      .find({})
+      .sort({ createdAt: -1 })
+      .toArray();
+
+    res.status(200).json({
+      success: true,
+      message: "Reviews fetched successfully",
+      data: reviews,
+    });
+  } catch (err) {
+    console.error("Error fetching reviews:", err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+
