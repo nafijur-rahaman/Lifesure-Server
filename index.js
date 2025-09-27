@@ -460,16 +460,47 @@ app.post("/api/submit-application", async (req, res) => {
       nomineeRelation = "",
       health = [],
       policy_id = null,
+      frequency = "monthly" // default payment frequency
     } = req.body;
 
-    // Basic required validation
-    if (!name || !email || !phone) {
+    // Basic validation
+    if (!name || !email || !phone || !policy_id) {
       return res.status(400).json({
         success: false,
-        message: "Name, Email, and Phone are required.",
+        message: "Name, Email, Phone, and Policy ID are required."
       });
     }
 
+    // Fetch policy
+    const policy = await policyCollection.findOne({ _id: new ObjectId(policy_id) });
+    if (!policy) {
+      return res.status(404).json({ success: false, message: "Policy not found" });
+    }
+
+    // Create payment object
+    const amount = Number(policy.basePremium); // convert string to number
+    const payment = {
+      status: "Due",
+      amount: amount,
+      frequency: frequency,
+      lastPaymentDate: null,
+      nextPaymentDue: new Date()
+    };
+
+    // Create policyDetails object
+    const policyDetails = {
+      title: policy.title,
+      category: policy.category,
+      description: policy.description,
+      minAge: Number(policy.minAge),
+      maxAge: Number(policy.maxAge),
+      coverage: Number(policy.coverage),
+      duration: Number(policy.duration),
+      basePremium: amount,
+      image: policy.image
+    };
+
+    // Create application object
     const newApplication = {
       name,
       email,
@@ -480,23 +511,29 @@ app.post("/api/submit-application", async (req, res) => {
       nomineeRelation,
       health,
       policy_id,
-      status: "Pending", // default
-      agent: null, // no agent assigned yet
+      status: "Pending",
+      agent: null,
       createdAt: new Date(),
+      payment,       // attach payment info
+      policyDetails  // attach policy snapshot
     };
 
+    // Insert into DB
     const result = await applicationCollection.insertOne(newApplication);
 
     res.status(201).json({
       success: true,
       message: "Application submitted successfully",
-      data: { applicationId: result.insertedId },
+      data: { applicationId: result.insertedId }
     });
+
   } catch (err) {
     console.error("Error submitting application:", err);
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
+
+
 
 // Get all applications for a given agent by email
 app.get("/api/agent/:agentEmail/applications", async (req, res) => {
@@ -594,6 +631,8 @@ app.patch("/api/agent/application/:id/status", async (req, res) => {
   }
 });
 
+
+
 //get all applied policies by email
 
 app.get("/api/applied-policies", async (req, res) => {
@@ -618,6 +657,33 @@ app.get("/api/applied-policies", async (req, res) => {
     res.status(500).json({ success: false, message: "Internal server error" });
   }
 });
+
+
+// get approved policies for client
+app.get("/api/customer/payments", async (req, res) => {
+  try {
+    const { email } = req.query; // pass user email from frontend
+
+    if (!email) {
+      return res.status(400).json({ success: false, message: "Email is required" });
+    }
+
+    // Fetch all approved applications with payment info
+    const applications = await applicationCollection
+      .find({ email, status: "Approved" })
+      .toArray();
+
+    res.json({ success: true, data: applications });
+  } catch (err) {
+    console.error("Error fetching payment applications:", err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+
+
+
+
 
 // ----------------- Review Routes ----------------- //
 
