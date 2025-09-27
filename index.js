@@ -31,6 +31,7 @@ let blogCollection;
 let applicationCollection;
 let reviewCollection;
 let transactionsCollection;
+let claimCollection;
 
 async function run() {
   try {
@@ -44,6 +45,7 @@ async function run() {
     applicationCollection = db.collection("applications");
     reviewCollection = db.collection("reviews");
     transactionsCollection = db.collection("transactions");
+    claimCollection = db.collection("claims");
 
     console.log(`Connected to MongoDB: ${process.env.DB_NAME}`);
 
@@ -210,7 +212,6 @@ app.post("/api/users", async (req, res) => {
   }
 });
 
-
 // get user info
 
 app.post("/api/user-info", async (req, res) => {
@@ -218,13 +219,17 @@ app.post("/api/user-info", async (req, res) => {
     const { email } = req.body;
 
     if (!email) {
-      return res.status(400).json({ success: false, message: "Email is required" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Email is required" });
     }
 
     const user = await userCollection.findOne({ email });
 
     if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     // Return full user object
@@ -237,7 +242,6 @@ app.post("/api/user-info", async (req, res) => {
     return res.status(500).json({ success: false, message: "Server error" });
   }
 });
-
 
 // get all users
 
@@ -462,21 +466,25 @@ app.post("/api/submit-application", async (req, res) => {
       nomineeRelation = "",
       health = [],
       policy_id = null,
-      frequency = "monthly" // default payment frequency
+      frequency = "monthly", // default payment frequency
     } = req.body;
 
     // Basic validation
     if (!name || !email || !phone || !policy_id) {
       return res.status(400).json({
         success: false,
-        message: "Name, Email, Phone, and Policy ID are required."
+        message: "Name, Email, Phone, and Policy ID are required.",
       });
     }
 
     // Fetch policy
-    const policy = await policyCollection.findOne({ _id: new ObjectId(policy_id) });
+    const policy = await policyCollection.findOne({
+      _id: new ObjectId(policy_id),
+    });
     if (!policy) {
-      return res.status(404).json({ success: false, message: "Policy not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Policy not found" });
     }
 
     // Create payment object
@@ -486,7 +494,7 @@ app.post("/api/submit-application", async (req, res) => {
       amount: amount,
       frequency: frequency,
       lastPaymentDate: null,
-      nextPaymentDue: new Date()
+      nextPaymentDue: new Date(),
     };
 
     // Create policyDetails object
@@ -499,7 +507,7 @@ app.post("/api/submit-application", async (req, res) => {
       coverage: Number(policy.coverage),
       duration: Number(policy.duration),
       basePremium: amount,
-      image: policy.image
+      image: policy.image,
     };
 
     // Create application object
@@ -516,8 +524,8 @@ app.post("/api/submit-application", async (req, res) => {
       status: "Pending",
       agent: null,
       createdAt: new Date(),
-      payment,       // attach payment info
-      policyDetails  // attach policy snapshot
+      payment, // attach payment info
+      policyDetails, // attach policy snapshot
     };
 
     // Insert into DB
@@ -526,16 +534,13 @@ app.post("/api/submit-application", async (req, res) => {
     res.status(201).json({
       success: true,
       message: "Application submitted successfully",
-      data: { applicationId: result.insertedId }
+      data: { applicationId: result.insertedId },
     });
-
   } catch (err) {
     console.error("Error submitting application:", err);
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
-
-
 
 // Get all applications for a given agent by email
 app.get("/api/agent/:agentEmail/applications", async (req, res) => {
@@ -633,7 +638,6 @@ app.patch("/api/agent/application/:id/status", async (req, res) => {
   }
 });
 
-
 // get specific application by id
 app.get("/api/get-application/:id", async (req, res) => {
   try {
@@ -652,7 +656,6 @@ app.get("/api/get-application/:id", async (req, res) => {
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
-
 
 //get all applied policies by email
 
@@ -679,14 +682,15 @@ app.get("/api/applied-policies", async (req, res) => {
   }
 });
 
-
 // get approved policies for client
 app.get("/api/customer/payments", async (req, res) => {
   try {
     const { email } = req.query; // pass user email from frontend
 
     if (!email) {
-      return res.status(400).json({ success: false, message: "Email is required" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Email is required" });
     }
 
     // Fetch all approved applications with payment info
@@ -701,13 +705,7 @@ app.get("/api/customer/payments", async (req, res) => {
   }
 });
 
-
-
-
-
-
 // ----------------- Review Routes ----------------- //
-
 
 // create reviews
 
@@ -744,29 +742,25 @@ app.get("/api/reviews", async (req, res) => {
   }
 });
 
-
 //----------------- Payment Routes ----------------- //
-
 
 // stripe payment creation
 
-
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
 // 1️⃣ Create PaymentIntent
-app.post('/api/create-payment', async (req, res) => {
+app.post("/api/create-payment", async (req, res) => {
   // console.log(req.body);
   const { policyId, policyName, amount, customerEmail } = req.body;
 
-
   if (!policyId || !policyName || !amount || !customerEmail) {
-    return res.status(400).json({ error: 'Missing required fields' });
+    return res.status(400).json({ error: "Missing required fields" });
   }
 
   try {
     const paymentIntent = await stripe.paymentIntents.create({
       amount: amount * 100, // convert Taka to poisha
-      currency: 'usd',
+      currency: "usd",
       receipt_email: customerEmail,
       metadata: { policyId, policyName },
     });
@@ -778,72 +772,226 @@ app.post('/api/create-payment', async (req, res) => {
   }
 });
 
-
-
-
 // Save transaction after success and update status and new date in applicationCollection
-app.post('/api/save-transaction', async (req, res) => {
+app.post("/api/save-transaction", async (req, res) => {
   const { paymentIntentId, email, policyId, applicationId } = req.body;
 
   if (!paymentIntentId || !email || !policyId || !applicationId) {
-    return res.status(400).json({ error: 'Missing required fields' });
+    return res.status(400).json({ error: "Missing required fields" });
   }
 
   try {
     const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
     const amount = paymentIntent.amount / 100; // poisha → taka
-    const status = paymentIntent.status; 
+    const status = paymentIntent.status;
     const date = new Date();
 
     // ✅ Find application by applicationId
-    const application = await applicationCollection.findOne({ _id: new ObjectId(applicationId), email });
-    if (!application) return res.status(404).json({ error: "Application not found" });
+    const application = await applicationCollection.findOne({
+      _id: new ObjectId(applicationId),
+      email,
+    });
+    if (!application)
+      return res.status(404).json({ error: "Application not found" });
 
-    const policyName = application.policyDetails?.title || paymentIntent.metadata.policyName;
+    const policyName =
+      application.policyDetails?.title || paymentIntent.metadata.policyName;
 
     // calculate next due date based on frequency
     const frequency = application.payment?.frequency || "monthly";
     let nextPayment = new Date();
-    if (frequency === "monthly") nextPayment.setMonth(nextPayment.getMonth() + 1);
-    else if (frequency === "yearly") nextPayment.setFullYear(nextPayment.getFullYear() + 1);
+    if (frequency === "monthly")
+      nextPayment.setMonth(nextPayment.getMonth() + 1);
+    else if (frequency === "yearly")
+      nextPayment.setFullYear(nextPayment.getFullYear() + 1);
 
     // ✅ Update application record
     await applicationCollection.updateOne(
       { _id: new ObjectId(applicationId), email },
-      { $set: {
+      {
+        $set: {
           status: "Approved",
           "payment.status": "Paid",
           "payment.lastPaymentDate": date,
           "payment.nextPaymentDue": nextPayment,
-          "payment.paymentIntentId": paymentIntentId
-        }
+          "payment.paymentIntentId": paymentIntentId,
+        },
       }
     );
 
     // save transaction log
     const transaction = {
       transactionId: paymentIntentId,
-      applicationId,   // ✅ link transaction to application
-      policyId,        // keep for reference
+      applicationId, // ✅ link transaction to application
+      policyId, // keep for reference
       customerEmail: email,
       policyName,
       paidAmount: amount,
       date,
-      status
+      status,
     };
 
     await transactionsCollection.insertOne(transaction);
 
-    res.json({ 
-      success: true, 
-      message: 'Transaction saved successfully', 
-      data: { ...transaction, nextPaymentDue: nextPayment }
+    res.json({
+      success: true,
+      message: "Transaction saved successfully",
+      data: { ...transaction, nextPaymentDue: nextPayment },
     });
-
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
   }
 });
 
+// get all transactions
+app.get("/api/get-transactions", async (req, res) => {
+  try {
+    const transactions = await transactionsCollection.find().toArray();
+    res.status(200).json({
+      success: true,
+      message: "Transactions fetched successfully",
+      data: transactions,
+    });
+  } catch (err) {
+    console.error("Error fetching transactions:", err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
 
+//-----------------------Claim request routes------------------//
+
+// get all claims
+app.get("/api/claims", async (req, res) => {
+  try {
+    const { email } = req.query;
+    if (!email)
+      return res
+        .status(400)
+        .json({ success: false, message: "Email is required" });
+
+    const claims = await claimCollection
+      .find({ customerEmail: email })
+      .toArray();
+    res.status(200).json({ success: true, data: claims });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+//create new claim
+
+app.post("/api/claim-request", async (req, res) => {
+  try {
+    console;
+    const { policy_id, customerEmail, reason, document } = req.body;
+
+    if (!policy_id || !customerEmail || !reason) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Missing required fields" });
+    }
+
+    // Check if claim already exists
+    const existingClaim = await claimCollection.findOne({
+      policy_id,
+      customerEmail,
+    });
+    if (existingClaim) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Claim already submitted" });
+    }
+
+    const result = await claimCollection.insertOne({
+      policy_id,
+      customerEmail,
+      reason,
+      document,
+      status: "Pending",
+      createdAt: new Date(),
+    });
+
+    res
+      .status(201)
+      .json({
+        success: true,
+        message: "Claim submitted successfully",
+        data: result,
+      });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+//get all claims
+
+app.get("/api/get-all-claims", async (req, res) => {
+  try {
+    const claims = await claimCollection.find().toArray();
+    res.status(200).json({ success: true, data: claims });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+// approve or reject claim
+
+app.patch("/api/claim-approve/:claimId", async (req, res) => {
+  try {
+    const { claimId } = req.params;
+
+    // Find the claim
+    const claim = await claimCollection.findOne({ _id: new ObjectId(claimId) });
+    if (!claim)
+      return res
+        .status(404)
+        .json({ success: false, message: "Claim not found" });
+
+    // Update claim status
+    await claimCollection.updateOne(
+      { _id: new ObjectId(claimId) },
+      { $set: { status: "Approved", approvedAt: new Date() } }
+    );
+
+    // Increment policy purchase count
+    await policyCollection.updateOne(
+      { _id: new ObjectId(claim.policyId) },
+      { $inc: { purchaseCount: 1 } }
+    );
+
+    res
+      .status(200)
+      .json({ success: true, message: "Claim approved successfully" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+// get claim by policy ID
+app.get("/api/claim-by-policy/:policy_id", async (req, res) => {
+  try {
+    const { policy_id } = req.params;
+
+    if (!policy_id) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Policy ID is required" });
+    }
+
+    const claim = await claimCollection.findOne({ policy_id });
+
+    if (!claim) {
+      return res.status(200).json({ success: true, data: null });
+    }
+
+    res.status(200).json({ success: true, data: claim });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
