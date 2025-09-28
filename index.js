@@ -121,7 +121,7 @@ app.post("/api/refresh", (req, res) => {
 
 //create new polices
 
-app.post("/api/create-polices", async (req, res) => {
+app.post("/api/create-polices",verifyJWT, async (req, res) => {
   const newPolicy = req.body;
 
   try {
@@ -138,7 +138,7 @@ app.post("/api/create-polices", async (req, res) => {
 
 // update policy
 
-app.put("/api/update-policy/:id", async (req, res) => {
+app.put("/api/update-policy/:id", verifyJWT, async (req, res) => {
   const policyId = req.params.id;
   const updatedPolicy = req.body;
 
@@ -161,7 +161,7 @@ app.put("/api/update-policy/:id", async (req, res) => {
 
 // get all policies
 
-app.get("/api/get-policies", async (req, res) => {
+app.get("/api/get-policies",  async (req, res) => {
   try {
     const policies = await policyCollection.find().toArray();
     res.status(200).json({
@@ -189,14 +189,14 @@ app.get("/api/get-top-policies", async (req, res) => {
       data: policies,
     });
   } catch (err) {
-    console.error(err);
+    // console.error(err);
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
 
 //get policy by id
 
-app.get("/api/get-policy/:id", async (req, res) => {
+app.get("/api/get-policy/:id", verifyJWT, async (req, res) => {
   try {
     const policyId = req.params.id;
     const policy = await policyCollection.findOne({
@@ -214,7 +214,7 @@ app.get("/api/get-policy/:id", async (req, res) => {
 
 // delete policy
 
-app.delete("/api/delete-policy/:id", async (req, res) => {
+app.delete("/api/delete-policy/:id", verifyJWT, async (req, res) => {
   try {
     const policyId = req.params.id;
     const result = await policyCollection.deleteOne({
@@ -234,7 +234,7 @@ app.delete("/api/delete-policy/:id", async (req, res) => {
 
 // check if user exist or not if not exist then create user
 
-app.post("/api/users", async (req, res) => {
+app.post("/api/users", verifyJWT, async (req, res) => {
   try {
     const { email } = req.body;
 
@@ -265,7 +265,7 @@ app.post("/api/users", async (req, res) => {
       data: result,
     });
   } catch (err) {
-    console.error(err);
+    // console.error(err);
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
@@ -284,9 +284,7 @@ app.get("/api/user-info", async (req, res) => {
     const user = await userCollection.findOne({ email });
 
     if (!user) {
-      return res
-        .status(404)
-        .json({ success: false, message: "User not found" });
+     return res.status(200).json({ success: true, data: null });
     }
 
     // Return full user object
@@ -295,7 +293,7 @@ app.get("/api/user-info", async (req, res) => {
       data: user,
     });
   } catch (err) {
-    console.error(err);
+    // console.error(err);
     return res.status(500).json({ success: false, message: "Server error" });
   }
 });
@@ -303,7 +301,7 @@ app.get("/api/user-info", async (req, res) => {
 
 // get all users
 
-app.get("/api/get-users", async (req, res) => {
+app.get("/api/get-users", verifyJWT, async (req, res) => {
   try {
     const users = await userCollection.find().toArray();
     res.status(200).json({
@@ -317,7 +315,7 @@ app.get("/api/get-users", async (req, res) => {
 });
 
 // Update user role
-app.put("/api/update-user-role/:id", async (req, res) => {
+app.put("/api/update-user-role/:id", verifyJWT, async (req, res) => {
   try {
     const userId = req.params.id;
     const { role } = req.body;
@@ -334,7 +332,7 @@ app.put("/api/update-user-role/:id", async (req, res) => {
 });
 
 // Delete user
-app.delete("/api/delete-user/:id", async (req, res) => {
+app.delete("/api/delete-user/:id", verifyJWT, async (req, res) => {
   try {
     const userId = req.params.id;
     const result = await userCollection.deleteOne({
@@ -349,7 +347,7 @@ app.delete("/api/delete-user/:id", async (req, res) => {
 
 // get just agent user
 
-app.get("/api/get-agent-users", async (req, res) => {
+app.get("/api/get-agent-users",  async (req, res) => {
   try {
     const users = await userCollection.find({ role: "agent" }).toArray();
     res.status(200).json({
@@ -378,7 +376,7 @@ app.get("/api/get-blogs", async (req, res) => {
 });
 
 // get blog by user id
-app.get("/api/get-blogs", async (req, res) => {
+app.get("/api/get-blogs", verifyJWT, async (req, res) => {
   try {
     const { userId } = req.query;
     let query = {};
@@ -397,7 +395,7 @@ app.get("/api/get-blogs", async (req, res) => {
 
 // get blog by blog id
 
-app.get("/api/get-blog/:id", async (req, res) => {
+app.get("/api/get-blog/:id", verifyJWT, async (req, res) => {
   try {
     const blogId = req.params.id;
     const blog = await blogCollection.findOne({ _id: new ObjectId(blogId) });
@@ -413,7 +411,7 @@ app.get("/api/get-blog/:id", async (req, res) => {
 
 // create blog
 
-app.post("/api/create-blog", async (req, res) => {
+app.post("/api/create-blog", verifyJWT, async (req, res) => {
   try {
     const blogData = {
       ...req.body,
@@ -431,6 +429,7 @@ app.post("/api/create-blog", async (req, res) => {
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
+
 
 //increment visit count
 
@@ -453,14 +452,14 @@ app.post("/api/increment-visit/:id", async (req, res) => {
       data: result.value,
     });
   } catch (err) {
-    console.error(err);
+    // console.error(err);
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
 
 // update blog
 
-app.put("/api/update-blog/:id", async (req, res) => {
+app.put("/api/update-blog/:id", verifyJWT, async (req, res) => {
   try {
     const blogId = req.params.id;
     const result = await blogCollection.updateOne(
@@ -479,7 +478,7 @@ app.put("/api/update-blog/:id", async (req, res) => {
 
 // delete blog
 
-app.delete("/api/delete-blog/:id", async (req, res) => {
+app.delete("/api/delete-blog/:id", verifyJWT, async (req, res) => {
   try {
     const blogId = req.params.id;
     const result = await blogCollection.deleteOne({
@@ -499,7 +498,7 @@ app.delete("/api/delete-blog/:id", async (req, res) => {
 
 //get all submitted application
 
-app.get("/api/applications", async (req, res) => {
+app.get("/api/applications", verifyJWT, async (req, res) => {
   try {
     const applications = await applicationCollection
       .find()
@@ -520,13 +519,13 @@ app.get("/api/applications", async (req, res) => {
 
     res.status(200).json({ success: true, data: applicationsWithPolicy });
   } catch (err) {
-    console.error(err);
+    // console.error(err);
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
 
 // Update application set agent
-app.patch("/api/application/:id/assign-agent", async (req, res) => {
+app.patch("/api/application/:id/assign-agent", verifyJWT, async (req, res) => {
   try {
     const { id } = req.params;
     const { agent } = req.body;
@@ -553,14 +552,14 @@ app.patch("/api/application/:id/assign-agent", async (req, res) => {
       message: "Agent assigned successfully",
     });
   } catch (err) {
-    console.error("Error assigning agent:", err);
+    // console.error("Error assigning agent:", err);
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
 
 //submit application
 
-app.post("/api/submit-application", async (req, res) => {
+app.post("/api/submit-application", verifyJWT, async (req, res) => {
   try {
     const {
       name,
@@ -643,13 +642,13 @@ app.post("/api/submit-application", async (req, res) => {
       data: { applicationId: result.insertedId },
     });
   } catch (err) {
-    console.error("Error submitting application:", err);
+    // console.error("Error submitting application:", err);
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
 
 // Get all applications for a given agent by email
-app.get("/api/agent/:agentEmail/applications", async (req, res) => {
+app.get("/api/agent/:agentEmail/applications", verifyJWT, async (req, res) => {
   try {
     const { agentEmail } = req.params;
 
@@ -681,14 +680,14 @@ app.get("/api/agent/:agentEmail/applications", async (req, res) => {
 
     res.status(200).json({ success: true, data: applicationsWithPolicy });
   } catch (err) {
-    console.error("Error fetching agent applications:", err);
+    // console.error("Error fetching agent applications:", err);
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
 
 //update status and purchase count
 
-app.patch("/api/agent/application/:id/status", async (req, res) => {
+app.patch("/api/agent/application/:id/status", verifyJWT, async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
@@ -739,13 +738,13 @@ app.patch("/api/agent/application/:id/status", async (req, res) => {
       .status(200)
       .json({ success: true, message: "Status updated successfully" });
   } catch (err) {
-    console.error("Error updating application status:", err);
+    // console.error("Error updating application status:", err);
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
 
 // get specific application by id
-app.get("/api/get-application/:id", async (req, res) => {
+app.get("/api/get-application/:id", verifyJWT, async (req, res) => {
   try {
     const { id } = req.params;
     const application = await applicationCollection.findOne({
@@ -758,14 +757,14 @@ app.get("/api/get-application/:id", async (req, res) => {
     }
     res.status(200).json({ success: true, data: application });
   } catch (err) {
-    console.error("Error fetching application:", err);
+    // console.error("Error fetching application:", err);
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
 
 //get all applied policies by email
 
-app.get("/api/applied-policies", async (req, res) => {
+app.get("/api/applied-policies", verifyJWT, async (req, res) => {
   try {
     const { email } = req.query;
 
@@ -783,13 +782,13 @@ app.get("/api/applied-policies", async (req, res) => {
 
     res.status(200).json({ success: true, data: applications });
   } catch (err) {
-    console.error("Error fetching applied policies:", err.message);
+    //console.error("Error fetching applied policies:", err.message);
     res.status(500).json({ success: false, message: "Internal server error" });
   }
 });
 
 // get approved policies for client
-app.get("/api/customer/payments", async (req, res) => {
+app.get("/api/customer/payments", verifyJWT, async (req, res) => {
   try {
     const { email } = req.query; // pass user email from frontend
 
@@ -806,7 +805,7 @@ app.get("/api/customer/payments", async (req, res) => {
 
     res.json({ success: true, data: applications });
   } catch (err) {
-    console.error("Error fetching payment applications:", err);
+    // console.error("Error fetching payment applications:", err);
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
@@ -815,7 +814,7 @@ app.get("/api/customer/payments", async (req, res) => {
 
 // create reviews
 
-app.post("/api/create-reviews", async (req, res) => {
+app.post("/api/create-reviews", verifyJWT, async (req, res) => {
   try {
     const result = await reviewCollection.insertOne(req.body);
     res.status(201).json({
@@ -843,7 +842,7 @@ app.get("/api/reviews", async (req, res) => {
       data: reviews,
     });
   } catch (err) {
-    console.error("Error fetching reviews:", err);
+    // console.error("Error fetching reviews:", err);
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
@@ -854,8 +853,8 @@ app.get("/api/reviews", async (req, res) => {
 
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
-// 1️⃣ Create PaymentIntent
-app.post("/api/create-payment", async (req, res) => {
+
+app.post("/api/create-payment", verifyJWT, async (req, res) => {
   // console.log(req.body);
   const { policyId, policyName, amount, customerEmail } = req.body;
 
@@ -873,7 +872,7 @@ app.post("/api/create-payment", async (req, res) => {
 
     res.json({ clientSecret: paymentIntent.client_secret });
   } catch (err) {
-    console.error(err);
+    // console.error(err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -892,7 +891,7 @@ app.post("/api/save-transaction", async (req, res) => {
     const status = paymentIntent.status;
     const date = new Date();
 
-    // ✅ Find application by applicationId
+    //  Find application by applicationId
     const application = await applicationCollection.findOne({
       _id: new ObjectId(applicationId),
       email,
@@ -911,7 +910,7 @@ app.post("/api/save-transaction", async (req, res) => {
     else if (frequency === "yearly")
       nextPayment.setFullYear(nextPayment.getFullYear() + 1);
 
-    // ✅ Update application record
+    //  Update application record
     await applicationCollection.updateOne(
       { _id: new ObjectId(applicationId), email },
       {
@@ -928,8 +927,8 @@ app.post("/api/save-transaction", async (req, res) => {
     // save transaction log
     const transaction = {
       transactionId: paymentIntentId,
-      applicationId, // ✅ link transaction to application
-      policyId, // keep for reference
+      applicationId, 
+      policyId, 
       customerEmail: email,
       policyName,
       paidAmount: amount,
@@ -945,13 +944,13 @@ app.post("/api/save-transaction", async (req, res) => {
       data: { ...transaction, nextPaymentDue: nextPayment },
     });
   } catch (err) {
-    console.error(err);
+    // console.error(err);
     res.status(500).json({ error: err.message });
   }
 });
 
 // get all transactions
-app.get("/api/get-transactions", async (req, res) => {
+app.get("/api/get-transactions", verifyJWT, async (req, res) => {
   try {
     const transactions = await transactionsCollection.find().toArray();
     res.status(200).json({
@@ -960,7 +959,7 @@ app.get("/api/get-transactions", async (req, res) => {
       data: transactions,
     });
   } catch (err) {
-    console.error("Error fetching transactions:", err);
+    // console.error("Error fetching transactions:", err);
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
@@ -968,7 +967,7 @@ app.get("/api/get-transactions", async (req, res) => {
 //-----------------------Claim request routes------------------//
 
 // get all claims
-app.get("/api/claims", async (req, res) => {
+app.get("/api/claims", verifyJWT, async (req, res) => {
   try {
     const { email } = req.query;
     if (!email)
@@ -981,16 +980,16 @@ app.get("/api/claims", async (req, res) => {
       .toArray();
     res.status(200).json({ success: true, data: claims });
   } catch (err) {
-    console.error(err);
+    // console.error(err);
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
 
 //create new claim
 
-app.post("/api/claim-request", async (req, res) => {
+app.post("/api/claim-request", verifyJWT, async (req, res) => {
   try {
-    console;
+ 
     const { policy_id, customerEmail, reason, document } = req.body;
 
     if (!policy_id || !customerEmail || !reason) {
@@ -1025,26 +1024,26 @@ app.post("/api/claim-request", async (req, res) => {
       data: result,
     });
   } catch (err) {
-    console.error(err);
+    // console.error(err);
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
 
 //get all claims
 
-app.get("/api/get-all-claims", async (req, res) => {
+app.get("/api/get-all-claims", verifyJWT, async (req, res) => {
   try {
     const claims = await claimCollection.find().toArray();
     res.status(200).json({ success: true, data: claims });
   } catch (err) {
-    console.error(err);
+    // console.error(err);
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
 
 // approve or reject claim
 
-app.patch("/api/claim-approve/:claimId", async (req, res) => {
+app.patch("/api/claim-approve/:claimId", verifyJWT, async (req, res) => {
   try {
     const { claimId } = req.params;
     const { status, agentEmail } = req.body;
@@ -1079,13 +1078,13 @@ app.patch("/api/claim-approve/:claimId", async (req, res) => {
       message: `Claim ${status.toLowerCase()} successfully`,
     });
   } catch (err) {
-    console.error(err);
+    // console.error(err);
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
 
 // get claim by policy ID
-app.get("/api/claim-by-policy/:policy_id", async (req, res) => {
+app.get("/api/claim-by-policy/:policy_id", verifyJWT, async (req, res) => {
   try {
     const { policy_id } = req.params;
 
@@ -1103,7 +1102,7 @@ app.get("/api/claim-by-policy/:policy_id", async (req, res) => {
 
     res.status(200).json({ success: true, data: claim });
   } catch (err) {
-    console.error(err);
+    // console.error(err);
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
@@ -1111,7 +1110,7 @@ app.get("/api/claim-by-policy/:policy_id", async (req, res) => {
 // ---------------- agent dashboard stats Routes ---------------- //
 
 // Get dashboard stats for a specific agent
-app.get("/api/agent/:email/stats", async (req, res) => {
+app.get("/api/agent/:email/stats", verifyJWT, async (req, res) => {
   try {
     const agentEmail = req.params.email;
 
@@ -1140,14 +1139,14 @@ app.get("/api/agent/:email/stats", async (req, res) => {
       },
     });
   } catch (err) {
-    console.error(err);
+    // console.error(err);
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
 
 // Get recent activity for a specific agent
 
-app.get("/api/agent/:email/recent-activity", async (req, res) => {
+app.get("/api/agent/:email/recent-activity", verifyJWT, async (req, res) => {
   try {
     const agentEmail = req.params.email;
     const limit = parseInt(req.query.limit) || 5;
@@ -1196,14 +1195,14 @@ app.get("/api/agent/:email/recent-activity", async (req, res) => {
 
     res.status(200).json({ success: true, data: activities.slice(0, limit) });
   } catch (err) {
-    console.error(err);
+    // console.error(err);
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
 
 //monthly activity
 
-app.get("/api/agent/:email/monthly-activity", async (req, res) => {
+app.get("/api/agent/:email/monthly-activity", verifyJWT, async (req, res) => {
   try {
     const agentEmail = req.params.email;
     const year = parseInt(req.query.year) || new Date().getFullYear();
@@ -1244,14 +1243,14 @@ app.get("/api/agent/:email/monthly-activity", async (req, res) => {
 
     res.status(200).json({ success: true, data });
   } catch (err) {
-    console.error(err);
+    // console.error(err);
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
 
 //------------------------------client dashboard stats routes ------------------//
 
-app.get("/api/client/:email/stats", async (req, res) => {
+app.get("/api/client/:email/stats", verifyJWT, async (req, res) => {
   try {
     const { email } = req.params;
 
@@ -1291,13 +1290,13 @@ app.get("/api/client/:email/stats", async (req, res) => {
       },
     });
   } catch (err) {
-    console.error(err);
+    // console.error(err);
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
 
 //client dashboard monthly payments routes
-app.get("/api/client/:email/monthly-payments", async (req, res) => {
+app.get("/api/client/:email/monthly-payments", verifyJWT, async (req, res) => {
   try {
     const { email } = req.params;
 
@@ -1345,14 +1344,14 @@ app.get("/api/client/:email/monthly-payments", async (req, res) => {
 
     res.json({ success: true, data: paymentsByMonth });
   } catch (err) {
-    console.error(err);
+    // console.error(err);
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
 
 //-------------------------admin dashboard stats routes ------------------//
 
-app.get("/api/admin/stats", async (req, res) => {
+app.get("/api/admin/stats", verifyJWT, async (req, res) => {
   try {
     const totalUsers = await userCollection.countDocuments();
     const totalPolicies = await policyCollection.countDocuments();
@@ -1373,14 +1372,14 @@ app.get("/api/admin/stats", async (req, res) => {
       },
     });
   } catch (err) {
-    console.error(err);
+    // console.error(err);
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
 
 //admin dashboard monthly payments routes
 
-app.get("/api/admin/monthly-payments", async (req, res) => {
+app.get("/api/admin/monthly-payments", verifyJWT, async (req, res) => {
   try {
     const payments = await transactionsCollection
       .aggregate([
@@ -1416,13 +1415,13 @@ app.get("/api/admin/monthly-payments", async (req, res) => {
 
     res.status(200).json({ success: true, data: monthlyData });
   } catch (err) {
-    console.error(err);
+    // console.error(err);
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
 
 // get policy distribution
-app.get("/api/admin/policy-distribution", async (req, res) => {
+app.get("/api/admin/policy-distribution", verifyJWT, async (req, res) => {
   try {
     const distribution = await applicationCollection
       .aggregate([
@@ -1444,7 +1443,7 @@ app.get("/api/admin/policy-distribution", async (req, res) => {
 
     res.status(200).json({ success: true, data: distribution });
   } catch (err) {
-    console.error(err);
+    // console.error(err);
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
@@ -1461,7 +1460,7 @@ app.post("/api/newsletter", async (req, res) => {
       data: result,
     });
   } catch (err) {
-    console.error(err);
+    // console.error(err);
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
