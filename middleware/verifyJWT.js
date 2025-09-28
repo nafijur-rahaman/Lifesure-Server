@@ -7,12 +7,12 @@ const verifyJWT = (req, res, next) => {
   if (!authHeader) return res.status(403).json({ message: "No token provided" });
 
   const token = authHeader.split(" ")[1];
-
   jwt.verify(token, JWT_SECRET, (err, decoded) => {
     if (err) return res.status(401).json({ message: "Invalid or expired token" });
     req.user = decoded;
     next();
   });
 };
+
 
 module.exports = verifyJWT;

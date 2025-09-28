@@ -5,6 +5,7 @@ const cors = require("cors");
 const jwt = require("jsonwebtoken");
 const verifyJWT = require("./middleware/verifyJWT");
 const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
 
 const app = express();
 app.use(cors());
@@ -66,18 +67,56 @@ app.get("/", (req, res) => {
   res.send("Hello, I am LifeSure!");
 });
 
-// login for retrieve jwt token
 
-app.post("/api/login", async (req, res) => {
+
+//-----------------auth routes------------------//
+
+// Helper functions
+const generateAccessToken = (payload) => {
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: "15m" }); // short life
+};
+
+const generateRefreshToken = (payload) => {
+  return jwt.sign(payload, JWT_REFRESH_SECRET, { expiresIn: "7d" }); // longer life
+};
+
+// Login
+app.post("/api/login", (req, res) => {
   const { email } = req.body;
-  if (!email)
-    return res
-      .status(400)
-      .json({ success: false, message: "Email is required." });
+  if (!email) return res.status(400).json({ success: false, message: "Email required" });
+
   const payload = { email };
-  const token = jwt.sign(payload, JWT_SECRET, { expiresIn: "1h" });
-  res.status(200).json({ success: true, message: "Login successful", token });
+  const accessToken = generateAccessToken(payload);
+  const refreshToken = generateRefreshToken(payload);
+
+  // Store refreshToken in DB (or in-memory for demo)
+  // Example: save it with user record
+  // user.refreshToken = refreshToken;
+
+  res.json({
+    success: true,
+    accessToken,
+    refreshToken,
+  });
 });
+
+
+
+app.post("/api/refresh", (req, res) => {
+  const { refreshToken } = req.body;
+  if (!refreshToken) return res.status(403).json({ message: "No refresh token provided" });
+
+  // Verify refresh token
+  jwt.verify(refreshToken, JWT_REFRESH_SECRET, (err, decoded) => {
+    if (err) return res.status(401).json({ message: "Invalid refresh token" });
+
+    const payload = { email: decoded.email };
+    const newAccessToken = generateAccessToken(payload);
+
+    res.json({ accessToken: newAccessToken });
+  });
+});
+
 
 //-----------------policy routes------------------//
 
@@ -1054,7 +1093,7 @@ app.get("/api/claim-by-policy/:policy_id", async (req, res) => {
 });
 
 
-// ---------------- dashboard stats Routes ---------------- //
+// ---------------- agent dashboard stats Routes ---------------- //
 
 
 // Get dashboard stats for a specific agent
@@ -1088,6 +1127,9 @@ app.get("/api/agent/:email/stats", async (req, res) => {
   }
 });
 
+
+
+// Get recent activity for a specific agent
 
 
 app.get("/api/agent/:email/recent-activity", async (req, res) => {
@@ -1133,6 +1175,7 @@ app.get("/api/agent/:email/recent-activity", async (req, res) => {
 });
 
 
+//monthly activity
 
 app.get("/api/agent/:email/monthly-activity", async (req, res) => {
   try {
@@ -1170,6 +1213,88 @@ app.get("/api/agent/:email/monthly-activity", async (req, res) => {
     });
 
     res.status(200).json({ success: true, data });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+//------------------------------client dashboard stats routes ------------------//
+
+
+app.get("/api/client/:email/stats", async (req, res) => {
+  try {
+    const { email } = req.params;
+
+    // Total policies
+    const policiesCount = await applicationCollection.countDocuments({ email: email });
+
+    // Pending claims
+    const pendingClaims = await claimCollection.countDocuments({ customerEmail: email, status: "Pending" });
+
+    // Approved claims
+    const approvedClaims = await claimCollection.countDocuments({ customerEmail: email, status: "Approved" });
+
+    // Total paid
+    const totalPaidAgg = await transactionsCollection.aggregate([
+      { $match: { customerEmail: email } },
+      { $group: { _id: null, total: { $sum: "$paidAmount" } } }
+    ]).toArray();
+    const totalPaid = totalPaidAgg[0]?.total || 0;
+
+    res.json({
+      success: true,
+      data: {
+        totalPolicies: policiesCount,
+        pendingClaims,
+        approvedClaims,
+        totalPaid
+      }
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+//client dashboard monthly payments routes 
+app.get("/api/client/:email/monthly-payments", async (req, res) => {
+  try {
+    const { email } = req.params;
+
+    // Aggregate payments by month
+    const monthlyPayments = await transactionsCollection
+      .aggregate([
+        { $match: { customerEmail: email } }, // filter by client
+        {
+          $group: {
+            _id: { $month: "$date" }, // assuming `paidAt` is Date
+            totalPaid: { $sum: "$paidAmount" },
+          },
+        },
+        { $sort: { "_id": 1 } },
+      ])
+      .toArray();
+
+    // Convert month number to month name
+    const monthNames = [
+      "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+    ];
+
+    // Initialize all months with 0
+    const paymentsByMonth = monthNames.map((month) => ({
+      month,
+      paid: 0,
+    }));
+
+    // Fill in aggregated values
+    monthlyPayments.forEach((mp) => {
+      const monthIndex = mp._id - 1; // MongoDB months are 1-12
+      paymentsByMonth[monthIndex].paid = mp.totalPaid;
+    });
+
+    res.json({ success: true, data: paymentsByMonth });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: "Server error" });
