@@ -33,6 +33,7 @@ let applicationCollection;
 let reviewCollection;
 let transactionsCollection;
 let claimCollection;
+let newsletterCollection;
 
 async function run() {
   try {
@@ -47,6 +48,7 @@ async function run() {
     reviewCollection = db.collection("reviews");
     transactionsCollection = db.collection("transactions");
     claimCollection = db.collection("claims");
+    newsletterCollection = db.collection("newsletters");
 
     console.log(`Connected to MongoDB: ${process.env.DB_NAME}`);
 
@@ -67,8 +69,6 @@ app.get("/", (req, res) => {
   res.send("Hello, I am LifeSure!");
 });
 
-
-
 //-----------------auth routes------------------//
 
 // Helper functions
@@ -83,7 +83,8 @@ const generateRefreshToken = (payload) => {
 // Login
 app.post("/api/login", (req, res) => {
   const { email } = req.body;
-  if (!email) return res.status(400).json({ success: false, message: "Email required" });
+  if (!email)
+    return res.status(400).json({ success: false, message: "Email required" });
 
   const payload = { email };
   const accessToken = generateAccessToken(payload);
@@ -100,11 +101,10 @@ app.post("/api/login", (req, res) => {
   });
 });
 
-
-
 app.post("/api/refresh", (req, res) => {
   const { refreshToken } = req.body;
-  if (!refreshToken) return res.status(403).json({ message: "No refresh token provided" });
+  if (!refreshToken)
+    return res.status(403).json({ message: "No refresh token provided" });
 
   // Verify refresh token
   jwt.verify(refreshToken, JWT_REFRESH_SECRET, (err, decoded) => {
@@ -116,7 +116,6 @@ app.post("/api/refresh", (req, res) => {
     res.json({ accessToken: newAccessToken });
   });
 });
-
 
 //-----------------policy routes------------------//
 
@@ -162,7 +161,7 @@ app.put("/api/update-policy/:id", async (req, res) => {
 
 // get all policies
 
-app.get("/api/get-policies", verifyJWT, async (req, res) => {
+app.get("/api/get-policies", async (req, res) => {
   try {
     const policies = await policyCollection.find().toArray();
     res.status(200).json({
@@ -174,6 +173,27 @@ app.get("/api/get-policies", verifyJWT, async (req, res) => {
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
+
+// get top purchased policies
+app.get("/api/get-top-policies", async (req, res) => {
+  try {
+    const policies = await policyCollection
+      .find({ purchaseCount: { $gt: 0 } }) 
+      .sort({ purchaseCount: -1 })
+      .limit(3)
+      .toArray();
+
+    res.status(200).json({
+      success: true,
+      message: "Policies fetched successfully",
+      data: policies,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
 
 //get policy by id
 
@@ -376,7 +396,6 @@ app.get("/api/get-blogs", async (req, res) => {
   }
 });
 
-
 // get blog by blog id
 
 app.get("/api/get-blog/:id", async (req, res) => {
@@ -393,14 +412,13 @@ app.get("/api/get-blog/:id", async (req, res) => {
   }
 });
 
-
 // create blog
 
 app.post("/api/create-blog", async (req, res) => {
   try {
     const blogData = {
       ...req.body,
-      visited: 0, 
+      visited: 0,
     };
 
     const result = await blogCollection.insertOne(blogData);
@@ -427,7 +445,9 @@ app.post("/api/increment-visit/:id", async (req, res) => {
     );
 
     if (!result.value) {
-      return res.status(404).json({ success: false, message: "Blog not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Blog not found" });
     }
 
     res.json({
@@ -440,8 +460,6 @@ app.post("/api/increment-visit/:id", async (req, res) => {
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
-
-
 
 // update blog
 
@@ -850,7 +868,7 @@ app.post("/api/create-payment", async (req, res) => {
 
   try {
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: amount * 100, 
+      amount: amount * 100,
       currency: "usd",
       receipt_email: customerEmail,
       metadata: { policyId, policyName },
@@ -1004,13 +1022,11 @@ app.post("/api/claim-request", async (req, res) => {
       createdAt: new Date(),
     });
 
-    res
-      .status(201)
-      .json({
-        success: true,
-        message: "Claim submitted successfully",
-        data: result,
-      });
+    res.status(201).json({
+      success: true,
+      message: "Claim submitted successfully",
+      data: result,
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: "Server error" });
@@ -1034,24 +1050,25 @@ app.get("/api/get-all-claims", async (req, res) => {
 app.patch("/api/claim-approve/:claimId", async (req, res) => {
   try {
     const { claimId } = req.params;
-    const { status, agentEmail } = req.body; 
+    const { status, agentEmail } = req.body;
 
     // Find the claim
     const claim = await claimCollection.findOne({ _id: new ObjectId(claimId) });
     if (!claim)
-      return res.status(404).json({ success: false, message: "Claim not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Claim not found" });
 
     await claimCollection.updateOne(
       { _id: new ObjectId(claimId) },
-      { 
-        $set: { 
-          status, 
-          approvedAt: status === "Approved" ? new Date() : null, 
-          agentEmail 
-        } 
+      {
+        $set: {
+          status,
+          approvedAt: status === "Approved" ? new Date() : null,
+          agentEmail,
+        },
       }
     );
-
 
     if (status === "Approved") {
       await policyCollection.updateOne(
@@ -1060,13 +1077,17 @@ app.patch("/api/claim-approve/:claimId", async (req, res) => {
       );
     }
 
-    res.status(200).json({ success: true, message: `Claim ${status.toLowerCase()} successfully` });
+    res
+      .status(200)
+      .json({
+        success: true,
+        message: `Claim ${status.toLowerCase()} successfully`,
+      });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
-
 
 // get claim by policy ID
 app.get("/api/claim-by-policy/:policy_id", async (req, res) => {
@@ -1092,9 +1113,7 @@ app.get("/api/claim-by-policy/:policy_id", async (req, res) => {
   }
 });
 
-
 // ---------------- agent dashboard stats Routes ---------------- //
-
 
 // Get dashboard stats for a specific agent
 app.get("/api/agent/:email/stats", async (req, res) => {
@@ -1102,15 +1121,19 @@ app.get("/api/agent/:email/stats", async (req, res) => {
     const agentEmail = req.params.email;
 
     // Blogs written by this agent
-    const blogsCount = await blogCollection.countDocuments({ authorEmail: agentEmail });
+    const blogsCount = await blogCollection.countDocuments({
+      authorEmail: agentEmail,
+    });
 
     // Customers assigned to this agent
-    const customersCount = await applicationCollection.countDocuments({ agent: agentEmail });
+    const customersCount = await applicationCollection.countDocuments({
+      agent: agentEmail,
+    });
 
     // Policies cleared by this agent
     const policiesClearedCount = await claimCollection.countDocuments({
       agentEmail: agentEmail,
-      status: "Approved"  // assuming "Approved" means cleared
+      status: "Approved", // assuming "Approved" means cleared
     });
 
     res.status(200).json({
@@ -1127,10 +1150,7 @@ app.get("/api/agent/:email/stats", async (req, res) => {
   }
 });
 
-
-
 // Get recent activity for a specific agent
-
 
 app.get("/api/agent/:email/recent-activity", async (req, res) => {
   try {
@@ -1159,9 +1179,21 @@ app.get("/api/agent/:email/recent-activity", async (req, res) => {
       .toArray();
 
     const activities = [
-      ...blogs.map(b => ({ type: "Blog Posted", name: b.title, date: b.date })),
-      ...customers.map(c => ({ type: "Customer Assigned", name: c.name, date: c.createdAt })),
-      ...policies.map(p => ({ type: "Policy Cleared", name: p.policy_id, date: p.approvedAt })),
+      ...blogs.map((b) => ({
+        type: "Blog Posted",
+        name: b.title,
+        date: b.date,
+      })),
+      ...customers.map((c) => ({
+        type: "Customer Assigned",
+        name: c.name,
+        date: c.createdAt,
+      })),
+      ...policies.map((p) => ({
+        type: "Policy Cleared",
+        name: p.policy_id,
+        date: p.approvedAt,
+      })),
     ];
 
     // Sort all activities by date descending
@@ -1173,7 +1205,6 @@ app.get("/api/agent/:email/recent-activity", async (req, res) => {
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
-
 
 //monthly activity
 
@@ -1200,15 +1231,19 @@ app.get("/api/agent/:email/monthly-activity", async (req, res) => {
 
     const blogs = await getMonthlyCount(blogCollection, "authorEmail");
     const customers = await getMonthlyCount(applicationCollection, "agent");
-    const policies = await getMonthlyCount(claimCollection, "agentEmail", "Approved");
+    const policies = await getMonthlyCount(
+      claimCollection,
+      "agentEmail",
+      "Approved"
+    );
 
     const data = Array.from({ length: 12 }, (_, i) => {
       const month = i + 1;
       return {
         month: new Date(0, i).toLocaleString("default", { month: "short" }),
-        blogs: blogs.find(b => b._id === month)?.count || 0,
-        customers: customers.find(c => c._id === month)?.count || 0,
-        policies: policies.find(p => p._id === month)?.count || 0,
+        blogs: blogs.find((b) => b._id === month)?.count || 0,
+        customers: customers.find((c) => c._id === month)?.count || 0,
+        policies: policies.find((p) => p._id === month)?.count || 0,
       };
     });
 
@@ -1221,25 +1256,34 @@ app.get("/api/agent/:email/monthly-activity", async (req, res) => {
 
 //------------------------------client dashboard stats routes ------------------//
 
-
 app.get("/api/client/:email/stats", async (req, res) => {
   try {
     const { email } = req.params;
 
     // Total policies
-    const policiesCount = await applicationCollection.countDocuments({ email: email });
+    const policiesCount = await applicationCollection.countDocuments({
+      email: email,
+    });
 
     // Pending claims
-    const pendingClaims = await claimCollection.countDocuments({ customerEmail: email, status: "Pending" });
+    const pendingClaims = await claimCollection.countDocuments({
+      customerEmail: email,
+      status: "Pending",
+    });
 
     // Approved claims
-    const approvedClaims = await claimCollection.countDocuments({ customerEmail: email, status: "Approved" });
+    const approvedClaims = await claimCollection.countDocuments({
+      customerEmail: email,
+      status: "Approved",
+    });
 
     // Total paid
-    const totalPaidAgg = await transactionsCollection.aggregate([
-      { $match: { customerEmail: email } },
-      { $group: { _id: null, total: { $sum: "$paidAmount" } } }
-    ]).toArray();
+    const totalPaidAgg = await transactionsCollection
+      .aggregate([
+        { $match: { customerEmail: email } },
+        { $group: { _id: null, total: { $sum: "$paidAmount" } } },
+      ])
+      .toArray();
     const totalPaid = totalPaidAgg[0]?.total || 0;
 
     res.json({
@@ -1248,8 +1292,8 @@ app.get("/api/client/:email/stats", async (req, res) => {
         totalPolicies: policiesCount,
         pendingClaims,
         approvedClaims,
-        totalPaid
-      }
+        totalPaid,
+      },
     });
   } catch (err) {
     console.error(err);
@@ -1257,7 +1301,7 @@ app.get("/api/client/:email/stats", async (req, res) => {
   }
 });
 
-//client dashboard monthly payments routes 
+//client dashboard monthly payments routes
 app.get("/api/client/:email/monthly-payments", async (req, res) => {
   try {
     const { email } = req.params;
@@ -1272,14 +1316,24 @@ app.get("/api/client/:email/monthly-payments", async (req, res) => {
             totalPaid: { $sum: "$paidAmount" },
           },
         },
-        { $sort: { "_id": 1 } },
+        { $sort: { _id: 1 } },
       ])
       .toArray();
 
     // Convert month number to month name
     const monthNames = [
-      "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
     ];
 
     // Initialize all months with 0
@@ -1295,6 +1349,122 @@ app.get("/api/client/:email/monthly-payments", async (req, res) => {
     });
 
     res.json({ success: true, data: paymentsByMonth });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+//-------------------------admin dashboard stats routes ------------------//
+
+app.get("/api/admin/stats", async (req, res) => {
+  try {
+    const totalUsers = await userCollection.countDocuments();
+    const totalPolicies = await policyCollection.countDocuments();
+    const totalApplications = await applicationCollection.countDocuments();
+
+    const totalPaymentsAgg = await transactionsCollection
+      .aggregate([{ $group: { _id: null, total: { $sum: "$paidAmount" } } }])
+      .toArray();
+    const totalPayments = totalPaymentsAgg[0]?.total || 0;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        totalUsers,
+        totalPolicies,
+        totalPayments,
+        totalApplications,
+      },
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+//admin dashboard monthly payments routes
+
+app.get("/api/admin/monthly-payments", async (req, res) => {
+  try {
+    const payments = await transactionsCollection
+      .aggregate([
+        {
+          $group: {
+            _id: { $month: "$date" }, // <-- use 'date', not 'createdAt'
+            amount: { $sum: "$paidAmount" },
+          },
+        },
+        { $sort: { _id: 1 } },
+      ])
+      .toArray();
+
+    const months = [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ];
+
+    const monthlyData = months.map((month, idx) => {
+      const found = payments.find((p) => p._id === idx + 1);
+      return { month, amount: found?.amount || 0 };
+    });
+
+    res.status(200).json({ success: true, data: monthlyData });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+// get policy distribution
+app.get("/api/admin/policy-distribution", async (req, res) => {
+  try {
+    const distribution = await applicationCollection
+      .aggregate([
+        {
+          $group: {
+            _id: "$policyDetails.category", // group by policy category
+            count: { $sum: 1 },
+          },
+        },
+        {
+          $project: {
+            _id: 0,
+            name: "$_id",
+            value: "$count",
+          },
+        },
+      ])
+      .toArray();
+
+    res.status(200).json({ success: true, data: distribution });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+});
+
+//---------------newsletter routes------------------//
+
+//create newsletter
+app.post("/api/newsletter", async (req, res) => {
+  try {
+    const result = await newsletterCollection.insertOne(req.body);
+    res.status(201).json({
+      success: true,
+      message: "Newsletter created successfully",
+      data: result,
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: "Server error" });
