@@ -178,7 +178,7 @@ app.get("/api/get-policies", async (req, res) => {
 app.get("/api/get-top-policies", async (req, res) => {
   try {
     const policies = await policyCollection
-      .find({ purchaseCount: { $gt: 0 } }) 
+      .find({ purchaseCount: { $gt: 0 } })
       .sort({ purchaseCount: -1 })
       .limit(3)
       .toArray();
@@ -193,7 +193,6 @@ app.get("/api/get-top-policies", async (req, res) => {
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
-
 
 //get policy by id
 
@@ -272,10 +271,9 @@ app.post("/api/users", async (req, res) => {
 });
 
 // get user info
-
-app.post("/api/user-info", async (req, res) => {
+app.get("/api/user-info", async (req, res) => {
   try {
-    const { email } = req.body;
+    const { email } = req.query; 
 
     if (!email) {
       return res
@@ -301,6 +299,7 @@ app.post("/api/user-info", async (req, res) => {
     return res.status(500).json({ success: false, message: "Server error" });
   }
 });
+
 
 // get all users
 
@@ -445,9 +444,7 @@ app.post("/api/increment-visit/:id", async (req, res) => {
     );
 
     if (!result.value) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Blog not found" });
+      return res.status(200).json({ success: true, data: null });
     }
 
     res.json({
@@ -1077,12 +1074,10 @@ app.patch("/api/claim-approve/:claimId", async (req, res) => {
       );
     }
 
-    res
-      .status(200)
-      .json({
-        success: true,
-        message: `Claim ${status.toLowerCase()} successfully`,
-      });
+    res.status(200).json({
+      success: true,
+      message: `Claim ${status.toLowerCase()} successfully`,
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: "Server error" });
