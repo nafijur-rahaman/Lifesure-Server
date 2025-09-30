@@ -685,63 +685,52 @@ app.get("/api/agent/:agentEmail/applications", verifyJWT, async (req, res) => {
   }
 });
 
+
 //update status and purchase count
 
 app.patch("/api/agent/application/:id/status", verifyJWT, async (req, res) => {
   try {
     const { id } = req.params;
-    const { status } = req.body;
+    const { status, feedback } = req.body;
 
     const allowedStatuses = ["Pending", "Approved", "Rejected"];
     if (!allowedStatuses.includes(status)) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Invalid status" });
+      return res.status(400).json({ success: false, message: "Invalid status" });
     }
 
     if (!status) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Status is required" });
+      return res.status(400).json({ success: false, message: "Status is required" });
     }
 
-    const application = await applicationCollection.findOne({
-      _id: new ObjectId(id),
-    });
+    const application = await applicationCollection.findOne({ _id: new ObjectId(id) });
     if (!application) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Application not found" });
+      return res.status(404).json({ success: false, message: "Application not found" });
     }
 
     const prevStatus = application.status;
 
-    // Update status
+    // Update status and feedback
     await applicationCollection.updateOne(
       { _id: new ObjectId(id) },
-      { $set: { status } }
+      { $set: { status, feedback: feedback || "" } }
     );
 
-    // If approved → increment purchase count (only once)
-    if (
-      status === "Approved" &&
-      prevStatus !== "Approved" &&
-      application.policy_id
-    ) {
+    // Increment purchaseCount if approved
+    if (status === "Approved" && prevStatus !== "Approved" && application.policy_id) {
       await policyCollection.updateOne(
         { _id: new ObjectId(application.policy_id) },
         { $inc: { purchaseCount: 1 } }
       );
     }
 
-    res
-      .status(200)
-      .json({ success: true, message: "Status updated successfully" });
+    res.status(200).json({ success: true, message: "Status updated successfully" });
   } catch (err) {
-    // console.error("Error updating application status:", err);
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
+
+
+
 
 // get specific application by id
 app.get("/api/get-application/:id", verifyJWT, async (req, res) => {
