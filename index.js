@@ -399,7 +399,7 @@ app.get("/api/get-agent-users", async (req, res) => {
 
 app.get("/api/get-blogs", async (req, res) => {
   try {
-    console.log("aisis ra asi");
+    // console.log("aisis ra asi");
     const blogs = await blogCollection.find().toArray();
     res.status(200).json({
       success: true,
