@@ -161,9 +161,16 @@ app.put("/api/update-policy/:id", verifyJWT, async (req, res) => {
 
 // get all policies
 
-app.get("/api/get-policies",  async (req, res) => {
+app.get("/api/get-policies", async (req, res) => {
   try {
-    const policies = await policyCollection.find().toArray();
+    const { search } = req.query;
+
+    const query = {};
+    if (search) {
+      query.title = { $regex: search, $options: "i" }; // case-insensitive
+    }
+
+    const policies = await policyCollection.find(query).toArray();
     res.status(200).json({
       success: true,
       message: "Policies fetched successfully",
@@ -173,6 +180,7 @@ app.get("/api/get-policies",  async (req, res) => {
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
+
 
 // get top purchased policies
 app.get("/api/get-top-policies", async (req, res) => {
