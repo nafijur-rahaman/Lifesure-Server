@@ -399,6 +399,7 @@ app.get("/api/get-agent-users", async (req, res) => {
 
 app.get("/api/get-blogs", async (req, res) => {
   try {
+    console.log("aisis ra asi");
     const blogs = await blogCollection.find().toArray();
     res.status(200).json({
       success: true,
@@ -411,9 +412,10 @@ app.get("/api/get-blogs", async (req, res) => {
 });
 
 // get blog by user id
-app.get("/api/get-blogs", verifyJWT, async (req, res) => {
+app.get("/api/get-blogs-user/", verifyJWT, async (req, res) => {
   try {
     const { userId } = req.query;
+    // console.log(userId);
     let query = {};
     if (userId) query.userId = userId;
 
