@@ -182,23 +182,36 @@ app.put(
 
 app.get("/api/get-policies", async (req, res) => {
   try {
-    const { search } = req.query;
+    const { search, page = 1, limit = 9 } = req.query;
 
     const query = {};
     if (search) {
-      query.title = { $regex: search, $options: "i" }; // case-insensitive
+      query.title = { $regex: search, $options: "i" };
     }
 
-    const policies = await policyCollection.find(query).toArray();
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const [policies, total] = await Promise.all([
+      policyCollection.find(query)
+        .skip(skip)
+        .limit(parseInt(limit))
+        .toArray(),
+      policyCollection.countDocuments(query),
+    ]);
+
     res.status(200).json({
       success: true,
       message: "Policies fetched successfully",
       data: policies,
+      total,
+      page: parseInt(page),
+      totalPages: Math.ceil(total / limit),
     });
   } catch (err) {
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
+
 
 // get top purchased policies
 app.get("/api/get-top-policies", async (req, res) => {
@@ -399,17 +412,37 @@ app.get("/api/get-agent-users", async (req, res) => {
 
 app.get("/api/get-blogs", async (req, res) => {
   try {
-    // console.log("aisis ra asi");
-    const blogs = await blogCollection.find().toArray();
+    const { page = 1, limit = 9, category } = req.query;
+
+    const query = {};
+    if (category && category !== "all") {
+      query.category = { $regex: `^${category}$`, $options: "i" };
+    }
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const [blogs, total] = await Promise.all([
+      blogCollection.find(query)
+        .skip(skip)
+        .limit(parseInt(limit))
+        .toArray(),
+      blogCollection.countDocuments(query),
+    ]);
+
     res.status(200).json({
       success: true,
       message: "Blogs fetched successfully",
       data: blogs,
+      total,
+      page: parseInt(page),
+      totalPages: Math.ceil(total / limit),
     });
   } catch (err) {
+    console.error("Error fetching blogs:", err);
     res.status(500).json({ success: false, message: "Server error" });
   }
 });
+
 
 // get blog by user id
 app.get("/api/get-blogs-user/", verifyJWT, async (req, res) => {
