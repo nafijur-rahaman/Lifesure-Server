@@ -212,6 +212,21 @@ app.get("/api/get-policies", async (req, res) => {
   }
 });
 
+//get policies by category
+
+app.get("/api/get-policies-category", async (req, res) => {
+try{
+  category = req.query.category;
+  const policies = await policyCollection.find({category:category}).toArray();
+  res.status(200).json({
+    success: true,
+    message: "Policies fetched successfully",
+    data: policies,
+  });
+}catch(err){
+  res.status(500).json({ success: false, message: "Server error" });
+}
+});
 
 // get top purchased policies
 app.get("/api/get-top-policies", async (req, res) => {
